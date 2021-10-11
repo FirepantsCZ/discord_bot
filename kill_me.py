@@ -9,7 +9,7 @@ import googletrans
 import datetime
 from googletrans import Translator
 import pprint
-from threading import Timer
+from threading import Timer, Thread
 import youtube_dl
 from youtube_easy_api.easy_wrapper import *
 from youtubesearchpython import *
@@ -42,6 +42,8 @@ tim = int(open("time.txt").read())
 ytdl_format_options = {
     'age_limit': '30',
     'format': 'bestaudio/best',
+    'extractaudio': True,
+    'audioformat': 'mp3',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
     'noplaylist': True,
@@ -49,15 +51,15 @@ ytdl_format_options = {
     'ignoreerrors': False,
     'logtostderr': False,
     'quiet': True,
-    'no_warnings': True,
+    'no_warnings': False,
     'cookiefile': r'cookies.txt',
     'default_search': 'auto',
     'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
 ffmpeg_options = {
-    'options': '-vn',
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 10"
+    'options': '-vn -ss 0',
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
@@ -162,21 +164,21 @@ print(callsign)
 
 @bot.command()
 async def np(ctx):
-    t = datetime.time(second=curtime, minute=curmin) #TODO: USE ONLY SECONDS INSTEAD OF MINUTES "str(datetime.timedelta(seconds=666))"
-    vid_len = time.strftime('%H:%M:%S', time.gmtime(pafy.new(prev).length))
+    #t = datetime.time(second=curtime, minute=curmin) #TODO: USE ONLY SECONDS INSTEAD OF MINUTES "str(datetime.timedelta(seconds=666))"
+    vid_len = pafy.new(prev).length
     #vid_len = datetime.timedelta(seconds=pafy.new(prev).length)
     print(vid_len)
     #await ctx.send(f"```{t.minute}:{t.second:02d}```")
     try:
         if vc.is_playing():
             metadata = yt.get_video_metadata(prev.split('?v=')[1][:11])
-            if int(str(vid_len)[:2]) > 0:
-                await ctx.send(f"Now playing:```{metadata['video_title']}\nat {t.hour:02d}:{t.minute:02}:{t.second:02d}/{str(vid_len)}```")
-            else:
-                if int(str(vid_len)[3]) == 0:
-                    await ctx.send(f"Now playing:```{metadata['video_title']}\nat {t.minute}:{t.second:02d}/{str(vid_len)[4:]}```")
-                else:
-                    await ctx.send(f"Now playing:```{metadata['video_title']}\nat {t.minute}:{t.second:02d}/{str(vid_len)[3:]}```")
+
+            desc=""
+            desc += f"[{metadata['video_title']}]({prev}) | `{format_time(curtime)} / {format_time(vid_len)}`"
+
+            embed = discord.Embed(title="**Now playing** :musical_note:", description=desc, color=0xff0000)
+            await ctx.send(embed=embed)
+
         else:
             await ctx.send(f"Not playing anything")
     except Exception as e:
@@ -240,6 +242,27 @@ async def queue(ctx):
         await ctx.send(embed=embed)
     else:
         await ctx.send("Queue is empty")
+
+@bot.command()
+async def seek(ctx, pos):
+    global ffmpeg_options
+    global queuelist
+    global vc
+    global curtime
+
+    ffmpeg_options["options"] = f'-vn -ss {pos}'
+    queuelist.insert(0, prev)
+    try:
+        vc.stop()
+    except:
+        await ctx.send("Error while seeking")
+        del queuelist[0]
+    if len(queuelist)-1 == 0:
+        print("jumpstarting playqueuelist")
+        await playqueuelist(ctx)
+    else:
+        print("playqueuelist should be looping")
+    curtime = int(pos)
 
 @bot.command()
 async def fs(ctx):
@@ -377,6 +400,8 @@ async def playqueuelist(ctx):
     global curmin
     global stopflag
 
+    print("Checking for stopped player")
+
     if len(queuelist) == 0:
         print("queuelist is empty, quitting")
         return
@@ -387,12 +412,12 @@ async def playqueuelist(ctx):
         print(e)
     try:
         vc_list = ctx.guild.voice_channels
-        print(f"connecting to {vc_list[0]}")
+        #print(f"connecting to {vc_list[0]}")
         #voicechannel = bot.get_channel(vchan)
         vc = await vc_list[0].connect()
         print(f"connected to {vc}")
     except Exception as e:
-        print(e) #ususally "already connected to VC"
+        #print(e) #ususally "already connected to VC"
         pass
     try:
         if vc.is_paused():
@@ -403,8 +428,9 @@ async def playqueuelist(ctx):
             #print("Already playing, added to queuelist and waiting")
             pass
         else:
+            print("Nothing playing, going to next song...")
             stopflag = True
-            await asyncio.sleep(1) #Set to 2 to be safe, test 1
+            await asyncio.sleep(1) #Set to 2 to be safe, 1 seems to work
             vc.play(player)
             if not loopone and not loopqueueflag:
                 prev = queuelist[0]
@@ -414,13 +440,16 @@ async def playqueuelist(ctx):
             curmin = 0
             print("starting timer")
             stopflag = False
-            await inctime()
+            #await inctime() #Maybe try to multithread the inctime? idk anymore shit's hard
+            t = Thread(target=asyncio.run, args=(inctime(),))
+            t.start()
+            print("after inctime")
             #timer.cancel()
 
     except Exception as e:
         await ctx.send("Error in player!")
         print(e)
-    await asyncio.sleep(5)
+    await asyncio.sleep(1) #1 Sec is experimental, for stability use 5 secs
     await playqueuelist(ctx)
 
 @bot.event
