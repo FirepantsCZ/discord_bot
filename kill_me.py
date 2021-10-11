@@ -123,6 +123,7 @@ def switch(x):
 def exfunc():
     print("stopped d")
     #client.get_channel(tchan).send(":octagonal_sign: **Bot stopped**")
+    #test
 atexit.register(exfunc)
 
 OPUS_LIBS = ['libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib']
