@@ -19,11 +19,11 @@ from discord_slash import SlashCommand
 from discord_slash.utils.manage_commands import create_option
 from pyyoutube import Api
 from youtube_api import YouTubeDataAPI
-import pafy #TODO: FIX THIS DICKHEAD
+import pafy #TODO: MAYBE TRY USING LESS THAN 30 YT APIs?
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 print(BOT_TOKEN)
-YT_API_KEY = os.getenv(YT_API_KEY)
+YT_API_KEY = os.getenv("YT_API_KEY")
 print(YT_API_KEY)
 
 easy_wrapper = YoutubeEasyWrapper()
@@ -170,7 +170,7 @@ async def np(ctx):
     try:
         if vc.is_playing():
             metadata = yt.get_video_metadata(prev.split('?v=')[1][:11])
-            if int(str(vid_len)[:2]) > 0: #May not work
+            if int(str(vid_len)[:2]) > 0:
                 await ctx.send(f"Now playing:```{metadata['video_title']}\nat {t.hour:02d}:{t.minute:02}:{t.second:02d}/{str(vid_len)}```")
             else:
                 if int(str(vid_len)[3]) == 0:
@@ -200,16 +200,44 @@ async def playlist(ctx, pls):
     if flg:
         await ctx.send(f"Playlist ```{pls}```not found")
 
+def format_time(secs):
+    formatted_time = time.strftime('%H:%M:%S', time.gmtime(secs))
+
+    if int(str(formatted_time)[:2]) > 0:
+        return formatted_time
+    if int(str(formatted_time)[3]) == 0:
+        return formatted_time[4:]
+    else:
+        return formatted_time[3:]
 
 @bot.command()
 async def queue(ctx):
-    nmlist = []
+    nmlist = [] #I think nmlist here is probably the list of all names of songs in queue
     print(queuelist)
     for i in queuelist:
         nmlist.append(yt.get_video_metadata(video_id=i.split("?v=")[1][:11])["video_title"])
-    if len(nmlist) != 0:
+    if len(nmlist) != 0: 
         txt = str(nmlist).replace('\'', '').strip('[]')
-        await ctx.send(f"```{txt}```")
+        #await ctx.send(f"```{txt}```")
+
+        desc=""
+        tot_time = 0
+
+        desc += f"\n**Now playing:**\n[{yt.get_video_metadata(video_id=prev.split('?v=')[1][:11])['video_title']}]({prev}) | `{format_time(pafy.new(prev).length)}`\n\n⎯⎯⎯⎯⎯\n"
+
+        for j in nmlist: #Add every song to queue embed
+            indx = nmlist.index(j)
+
+            vid_len = pafy.new(queuelist[indx]).length
+            tot_time += vid_len
+            dur = format_time(vid_len)
+
+            desc += f"\n`{indx+1}.` [{j}]({queuelist[indx]}) | `{dur}`\n"
+
+        desc += f"\n⎯⎯⎯⎯⎯\n\n**Total queue length**: `{format_time(tot_time)}`"
+
+        embed = discord.Embed(title="**Queue** :musical_note:", description=desc, color=0xff0000)
+        await ctx.send(embed=embed)
     else:
         await ctx.send("Queue is empty")
 
@@ -235,7 +263,7 @@ async def loop(ctx):
             del queuelist[0]
 
 @bot.command()
-async def loopqueue(ctx):
+async def loopqueue(ctx): #TODO: Add loopqueue function
     pass
 
 @bot.command()
@@ -259,9 +287,10 @@ async def play(ctx, *, search):
     
     #title = "faking ok nebij me este to nefunguje nejlip jo ok"
     title = metadata["video_title"]
+    thumb = metadata["video_thumbnail"]
     #print(metadata)
  
-    msg = await ctx.history(limit=1).flatten()
+    """ msg = await ctx.history(limit=1).flatten()
     try:
         try:
             if len(queuelist) == 0 and not vc.playing():
@@ -272,15 +301,26 @@ async def play(ctx, *, search):
             await msg[0].edit(content=f"Added to queue ```{title}```")
     except:
         print("can't edit message")
-        await ctx.send(f"Added to queue ```{title}```")
+        await ctx.send(f"Added to queue ```{title}```") """
         
     queuelist.append(vidlink)
-    await playqueuelist(ctx)
     #embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**{title}**]({vidlink})", color=0xff0000)
-    embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**Title**]({vidlink})", color=0xff0000)
-    #print(thumb)
-    #embed.set_image(url=thumb)
-    #await ctx.send(embed=embed) 
+    #embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**Title**]({vidlink})", color=0xff0000)
+    print(thumb)
+
+    msg = await ctx.history(limit=1).flatten()
+    try:
+        if vc.is_playing():
+            embed=discord.Embed(title="**Added to queue** :musical_note:", description=f"[**{title}**]({vidlink})", color=0xff0000)
+        else:
+            embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**{title}**]({vidlink})", color=0xff0000)
+    except:
+        embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**{title}**]({vidlink})", color=0xff0000)
+
+    embed.set_image(url=thumb)
+    await msg[0].edit(content="", embed=embed)
+    #await ctx.send(embed=embed)
+    await playqueuelist(ctx)
 
 async def start_timer():
     while True:
@@ -289,14 +329,8 @@ async def start_timer():
 
 async def inctime():
     global curtime
-    global curmin
-
-    if curtime == 60:
-        curmin += 1
-        curtime = 0
-
-    t = datetime.time(second=curtime, minute=curmin)
     #print(f"{t.minute}:{t.second:02d}")
+
     curtime += 1
 
     if not stopflag:
