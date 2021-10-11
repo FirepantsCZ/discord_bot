@@ -21,11 +21,16 @@ from pyyoutube import Api
 from youtube_api import YouTubeDataAPI
 import pafy #TODO: FIX THIS DICKHEAD
 
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+print(BOT_TOKEN)
+YT_API_KEY = os.getenv(YT_API_KEY)
+print(YT_API_KEY)
+
 easy_wrapper = YoutubeEasyWrapper()
-api = Api(api_key="AIzaSyC1kaJiBxbNPkJLXqPNQ9q-TTmyFcwhwpo")
-easy_wrapper.initialize(api_key="AIzaSyC1kaJiBxbNPkJLXqPNQ9q-TTmyFcwhwpo")
-yt = YouTubeDataAPI("AIzaSyC1kaJiBxbNPkJLXqPNQ9q-TTmyFcwhwpo")
-pafy.set_api_key("AIzaSyC1kaJiBxbNPkJLXqPNQ9q-TTmyFcwhwpo")
+api = Api(api_key=YT_API_KEY)
+easy_wrapper.initialize(api_key=YT_API_KEY)
+yt = YouTubeDataAPI(YT_API_KEY)
+pafy.set_api_key(YT_API_KEY)
 
 print(pafy.new("https://www.youtube.com/watch?v=cE127sNU3uk").length)
 
@@ -445,4 +450,4 @@ async def on_voice_state_update(member, before, after):
             pass
     #maybe time.sleep(1) here? test if it disconnects async
     
-bot.run('NzAxNzQyMjUzNjc2NDI5MzEz.Xp18IA.Lkx8Pcb4HHMWJXiFWf2EZfJXR3M')
+bot.run(BOT_TOKEN)
