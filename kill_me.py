@@ -431,7 +431,9 @@ async def playqueuelist(ctx):
             print("Nothing playing, going to next song...")
             stopflag = True
             await asyncio.sleep(1) #Set to 2 to be safe, 1 seems to work
-            vc.play(player)
+            pt = Thread(target=vc.play, args=(player,)) #Try starting player on different thread?
+            pt.start()
+            #vc.play(player) #TODO: FIX STUTTERING AND SKIPPING ISSUE (holy shit maybe threading actually works)
             if not loopone and not loopqueueflag:
                 prev = queuelist[0]
                 del queuelist[0]
