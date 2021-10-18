@@ -11,24 +11,24 @@ from googletrans import Translator
 import pprint
 from threading import Timer, Thread
 import youtube_dl
-from youtube_easy_api.easy_wrapper import *
+#from youtube_easy_api.easy_wrapper import *
 from youtubesearchpython import *
 import os
 import asyncio
 from discord_slash import SlashCommand
 from discord_slash.utils.manage_commands import create_option
-from pyyoutube import Api
+#from pyyoutube import Api
 from youtube_api import YouTubeDataAPI
-import pafy #TODO: MAYBE TRY USING LESS THAN 30 YT APIs?
+import pafy #TODO: MAYBE TRY USING LESS THAN 30 YT APIs? Try to maybe change all APIs to pytube
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 print(BOT_TOKEN)
 YT_API_KEY = os.getenv("YT_API_KEY")
 print(YT_API_KEY)
 
-easy_wrapper = YoutubeEasyWrapper()
-api = Api(api_key=YT_API_KEY)
-easy_wrapper.initialize(api_key=YT_API_KEY)
+#easy_wrapper = YoutubeEasyWrapper()
+#api = Api(api_key=YT_API_KEY)
+#easy_wrapper.initialize(api_key=YT_API_KEY)
 yt = YouTubeDataAPI(YT_API_KEY)
 pafy.set_api_key(YT_API_KEY)
 
@@ -64,12 +64,6 @@ ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 print(pafy.new("https://www.youtube.com/watch?v=4bvLaYLD1HI", ydl_opts=ytdl_format_options).length) #Pafy test
 
-
-class RepeatTimer(Timer):
-    def run(self):
-        while not self.finished.wait(self.interval):
-            self.function(*self.args, **self.kwargs)
-
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
@@ -91,47 +85,31 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
-tchan = 701758711407837214
-vchan = 699726889559785590
-
-#tchan and vchan are outdated, instead use ctx to get channels
-
-translator = Translator()
-langs = googletrans.LANGUAGES
-client = discord.Client()
-lang = json.loads(open("callsign.json", "r").read())[0].get("tolang")
+#translator = Translator()
+#langs = googletrans.LANGUAGES
+#client = discord.Client()
+#lang = json.loads(open("callsign.json", "r").read())[0].get("tolang")
 callsign = json.loads(open("callsign.json", "r").read())[0].get("callsign")
-last = json.loads(open("callsign.json", "r").read())[0].get("last")
-fromlang = json.loads(open("callsign.json", "r").read())[0].get("fromlang")
+#last = json.loads(open("callsign.json", "r").read())[0].get("last")
+#fromlang = json.loads(open("callsign.json", "r").read())[0].get("fromlang")
 playlists = json.loads(open("playlists.json", "r").read())
-print(playlists[0])
-print(playlists[1])
 #print(tim)
-queuelist = []  
+queuelist = []
 vc = False
-timer = False
 stopflag = False
-token = False
 prev = ""
 curtime = 0
-curmin = 0
 loopone = False
 loopqueueflag = False
 #print(callsign)
 #print(type(callsign))
 #opus.load_opus()
 
-def switch(x):
-    return {
-        '1': 1,
-        '2': 2,
-    }[x]
-
-def exfunc():
+""" def exfunc():
     print("stopped d")
     #client.get_channel(tchan).send(":octagonal_sign: **Bot stopped**")
     #tes
-atexit.register(exfunc)
+atexit.register(exfunc) """
 
 OPUS_LIBS = ['libopus-0.x86.dll', 'libopus-0.x64.dll', 'libopus-0.dll', 'libopus.so.0', 'libopus.0.dylib']
 
@@ -168,7 +146,7 @@ bot.remove_command("help")
 @bot.group(invoke_without_command=True)
 async def help(ctx):
     em = discord.Embed(title="Help", description="Use $help <command> for extended info on a command.", color=0xff0000)
-    em.add_field(name="Playback control", value="np,playlist,remove,queue,seek,fs,loop,play")
+    em.add_field(name="Playback control", value="`np`, `playlist`, `remove`, `queue`, `seek`, `fs`, `loop`, `play`, `pause`")
     await ctx.send(embed = em)
 
 @help.command()
@@ -235,15 +213,22 @@ async def play(ctx):
 
     await ctx.send(embed=em)
 
-###END HELP COMMANDS###
+@help.command()
+async def pause(ctx):
+    em = discord.Embed(title="Pause", description="Toggles pause and resume", color=0xff0000)
 
+    em.add_field(name="**Syntax**", value="`$pause`")
+
+    await ctx.send(embed=em)
+
+###BOT COMMANDS###
 
 @bot.command()
 async def np(ctx):
     #t = datetime.time(second=curtime, minute=curmin)
     vid_len = pafy.new(prev).length
     #vid_len = datetime.timedelta(seconds=pafy.new(prev).length)
-    print(vid_len)
+    #print(vid_len)
     #await ctx.send(f"```{t.minute}:{t.second:02d}```")
     try:
         if vc.is_playing():
@@ -259,7 +244,7 @@ async def np(ctx):
             await ctx.send(f"Not playing anything")
     except Exception as e:
         print(e)
-    await ctx.send(f"Not connected to VC")
+        await ctx.send(f"Not connected to VC")
 
 
 @bot.command()
@@ -278,16 +263,6 @@ async def playlist(ctx, playlist_name):
             flg = True
     if flg:
         await ctx.send(f"Playlist ```{playlist_name}```not found")
-
-def format_time(secs):
-    formatted_time = time.strftime('%H:%M:%S', time.gmtime(secs))
-
-    if int(str(formatted_time)[:2]) > 0:
-        return formatted_time
-    if int(str(formatted_time)[3]) == 0:
-        return formatted_time[4:]
-    else:
-        return formatted_time[3:]
 
 @bot.command()
 async def remove(ctx, queue_index):
@@ -377,6 +352,21 @@ async def loopqueue(ctx): #TODO: Add loopqueue function
     pass
 
 @bot.command()
+async def pause(ctx):
+    try:
+        if vc.is_paused():
+            vc.resume()
+            em = discord.Embed(title="Resumed :arrow_forward:", description=f"[{get_title(prev)}]({prev}) | `{format_time(curtime)} / {format_time(pafy.new(prev).length)}`", color=0xff0000)
+            await ctx.send(embed=em)
+        else:
+            vc.pause()
+            em = discord.Embed(title="Paused :pause_button:", description=f"[{get_title(prev)}]({prev}) | `{format_time(curtime)} / {format_time(pafy.new(prev).length)}`", color=0xff0000)
+            await ctx.send(embed=em)
+
+    except:
+        await ctx.send("Not connected to VC")
+
+@bot.command()
 async def play(ctx, *, search):
     global vc
 
@@ -432,20 +422,20 @@ async def play(ctx, *, search):
     #await ctx.send(embed=embed)
     await playqueuelist(ctx)
 
-###EXPERIMENT TIME###
-async def testinc(loop):
-    while True:
-        print("looping")
-        await asyncio.sleep(1)
+###UTILITY FUNCTIONS###
 
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-asyncio.ensure_future(testinc(loop))
-#loop.run_forever()
+def get_title(url):
+    return yt.get_video_metadata(video_id=url.split("?v=")[1][:11])["video_title"]
 
-testth = Thread(target=loop.run_forever)
-#testth.start()
-###ACTUALLY WORKS TIME###
+def format_time(secs):
+    formatted_time = time.strftime('%H:%M:%S', time.gmtime(secs))
+
+    if int(str(formatted_time)[:2]) > 0:
+        return formatted_time
+    if int(str(formatted_time)[3]) == 0:
+        return formatted_time[4:]
+    else:
+        return formatted_time[3:]
 
 async def inctime(loop):
     while True:
@@ -464,39 +454,6 @@ async def inctime(loop):
 timeloop = asyncio.new_event_loop()
 asyncio.set_event_loop(timeloop)
 asyncio.ensure_future(inctime(timeloop))
-
-###SLASH IS OLD, DONT USE
-@slash.slash(name="ping", guild_ids=guild_ids, description="Ahaa jako zkus to co myslíš že to dělá asi")
-async def _ping(ctx):
-    await ctx.send(f"Pong! ({client.latency*1000}ms)")
-
-@slash.slash(name="play", guild_ids=guild_ids, description="Přehraj ňákej jutub link", options=[create_option(name="playopt", description="link or search term", option_type=3, required=True)])
-async def _play(ctx, playopt: str, vc=vc):
-    mes = playopt
-    res = VideosSearch(mes, limit=3).result()
-    if mes.startswith("https://"):
-        await ctx.send(f"Loading...```{mes}```")
-        print("SHITE")
-        vidlink = mes
-        print(vidlink)
-
-    else:
-        await ctx.send(f"Loading...```{mes}```")
-        print("SHITE")
-        vidlink = res.get("result")[0].get("link")
-        print(vidlink)
-
-    queuelist.append(vidlink)
-    await playqueuelist(ctx)
-    #embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**{title}**]({vidlink})", color=0xff0000)
-    embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**Title**]({vidlink})", color=0xff0000)
-    #print(thumb)
-    #embed.set_image(url=thumb)
-    #await ctx.send(embed=embed) 
-    
-    msg = await client.get_channel(tchan).history(limit=1).flatten()
-    msg = msg[0]
-    await msg.edit(content=f"Playing ```{title}```")
 
 async def playqueuelist(ctx):
     global vc
@@ -559,43 +516,46 @@ async def playqueuelist(ctx):
     await asyncio.sleep(1) #1 Sec is experimental, for stability use 5 secs
     await playqueuelist(ctx)
 
+
+###SLASH IS OLD, DONT USE
+@slash.slash(name="ping", guild_ids=guild_ids, description="Ahaa jako zkus to co myslíš že to dělá asi")
+async def _ping(ctx):
+    await ctx.send(f"Pong! ({client.latency*1000}ms)")
+
+@slash.slash(name="play", guild_ids=guild_ids, description="Přehraj ňákej jutub link", options=[create_option(name="playopt", description="link or search term", option_type=3, required=True)])
+async def _play(ctx, playopt: str, vc=vc):
+    mes = playopt
+    res = VideosSearch(mes, limit=3).result()
+    if mes.startswith("https://"):
+        await ctx.send(f"Loading...```{mes}```")
+        print("SHITE")
+        vidlink = mes
+        print(vidlink)
+
+    else:
+        await ctx.send(f"Loading...```{mes}```")
+        print("SHITE")
+        vidlink = res.get("result")[0].get("link")
+        print(vidlink)
+
+    queuelist.append(vidlink)
+    await playqueuelist(ctx)
+    #embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**{title}**]({vidlink})", color=0xff0000)
+    embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**Title**]({vidlink})", color=0xff0000)
+    #print(thumb)
+    #embed.set_image(url=thumb)
+    #await ctx.send(embed=embed) 
+    
+    msg = await client.get_channel(tchan).history(limit=1).flatten()
+    msg = msg[0]
+    await msg.edit(content=f"Playing ```{title}```")
+
 @bot.event
 async def on_ready():
     print('We have logged in as {0.user}'.format(bot))
     #await client.get_channel(tchan).send(":white_check_mark: **Bot started**")
 
-async def hinzil(vc, sauce):
-    print(vc)
-    if vc == False:
-        vc = await voicechannel.connect()
-        print(vc)
-    if vc.is_playing() == True: 
-        vc.stop()
-        # disafter()
-    else:
-        AudioSrc = discord.FFmpegPCMAudio(executable=r"C:\Users\paolo\OneDrive\Dokumenty\ffmpeg\bin\ffmpeg.exe", source=sauce)
-        AudioSrcVol = discord.PCMVolumeTransformer(AudioSrc, 1.0)
-        vc.play(AudioSrcVol)
-        print("Opus:")
-        print(AudioSrc.is_opus())
-        while vc.is_playing():
-            time.sleep(0.5)
-        if loopone == True:
-            @client.event
-            async def on_message(message):
-                channel = client.get_channel(tchan)  
-                voicechannel = client.get_channel(vchan)
-                if (message.channel.id == tchan):
-                    if message.content == "ok":
-                        await channel.send("ne")
-            await hinzil(vc, sauce)
-        print("Setting vc to false...")
-        await vc.disconnect()
-        vc = False
-        # print("ok")
-        # disafter()
-
-@client.event
+""" @bot.event
 async def on_voice_state_update(member, before, after):
     channel = client.get_channel(tchan)
     voicechannel = client.get_channel(vchan)
@@ -618,6 +578,6 @@ async def on_voice_state_update(member, before, after):
         else:
             #print("not ok")
             pass
-    #maybe time.sleep(1) here? test if it disconnects async
+    #maybe time.sleep(1) here? test if it disconnects async """
     
 bot.run(BOT_TOKEN)
