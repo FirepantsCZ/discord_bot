@@ -32,8 +32,6 @@ easy_wrapper.initialize(api_key=YT_API_KEY)
 yt = YouTubeDataAPI(YT_API_KEY)
 pafy.set_api_key(YT_API_KEY)
 
-print(pafy.new("https://www.youtube.com/watch?v=cE127sNU3uk").length)
-
 s = sched.scheduler(time.time, asyncio.sleep)
 
 youtube_dl.utils.bug_reports_message = lambda: ''
@@ -63,6 +61,8 @@ ffmpeg_options = {
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+
+print(pafy.new("https://www.youtube.com/watch?v=4bvLaYLD1HI", ydl_opts=ytdl_format_options).length) #Pafy test
 
 
 class RepeatTimer(Timer):
@@ -164,7 +164,7 @@ print(callsign)
 
 @bot.command()
 async def np(ctx):
-    #t = datetime.time(second=curtime, minute=curmin) #TODO: USE ONLY SECONDS INSTEAD OF MINUTES "str(datetime.timedelta(seconds=666))"
+    #t = datetime.time(second=curtime, minute=curmin)
     vid_len = pafy.new(prev).length
     #vid_len = datetime.timedelta(seconds=pafy.new(prev).length)
     print(vid_len)
@@ -186,21 +186,21 @@ async def np(ctx):
         await ctx.send(f"Not connected to VC")
 
 @bot.command()
-async def playlist(ctx, pls):
+async def playlist(ctx, playlist_name):
     flg = False
     for i in playlists:
-        if pls == i.get("name"):
-            print(f"got {pls}")
+        if playlist_name == i.get("name"):
+            print(f"got {playlist_name}")
             for j in i:
                 if j != "name":
                     print(i.get(j))
                     queuelist.append(i.get(j))
-            await ctx.send(f"Added playlist ```{pls}```to queue")
+            await ctx.send(f"Added playlist ```{playlist_name}```to queue")
             await playqueuelist(ctx)
         else:
             flg = True
     if flg:
-        await ctx.send(f"Playlist ```{pls}```not found")
+        await ctx.send(f"Playlist ```{playlist_name}```not found")
 
 def format_time(secs):
     formatted_time = time.strftime('%H:%M:%S', time.gmtime(secs))
@@ -213,9 +213,19 @@ def format_time(secs):
         return formatted_time[3:]
 
 @bot.command()
+async def remove(ctx, queue_index):
+    global queuelist
+
+    if len(queuelist) >= int(index):
+        await ctx.send(f"Removed [{yt.get_video_metadata(video_id=queuelist[int(index)-1].split('?v=')[1][:11])['video_title']}]({queuelist[int(index)-1]})") #TODO: Optimise these lines to look a bit better
+        del queuelist[int(index)-1]
+    else:
+        await ctx.send("Invalid queue position!")
+
+@bot.command()
 async def queue(ctx):
     nmlist = [] #I think nmlist here is probably the list of all names of songs in queue
-    print(queuelist)
+    print(queuelist) #Queuelist should be the array of all queued links
     for i in queuelist:
         nmlist.append(yt.get_video_metadata(video_id=i.split("?v=")[1][:11])["video_title"])
     if len(nmlist) != 0: 
@@ -244,7 +254,7 @@ async def queue(ctx):
         await ctx.send("Queue is empty")
 
 @bot.command()
-async def seek(ctx, pos):
+async def seek(ctx, pos): #TODO: Fix longer loading for longre skip times(0-10 instant, 60 takes long)
     global ffmpeg_options
     global queuelist
     global vc
@@ -345,20 +355,38 @@ async def play(ctx, *, search):
     #await ctx.send(embed=embed)
     await playqueuelist(ctx)
 
-async def start_timer():
+###EXPERIMENT TIME###
+async def testinc(loop):
     while True:
+        print("looping")
         await asyncio.sleep(1)
-        await inctime()
 
-async def inctime():
-    global curtime
-    #print(f"{t.minute}:{t.second:02d}")
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+asyncio.ensure_future(testinc(loop))
+#loop.run_forever()
 
-    curtime += 1
+testth = Thread(target=loop.run_forever)
+#testth.start()
+###ACTUALLY WORKS TIME###
 
-    if not stopflag:
+async def inctime(loop):
+    while True:
+        global curtime
+        #print(f"{t.minute}:{t.second:02d}")
+
+        curtime += 1
+
+        #print(f"Stopflag is {stopflag}")
+        if stopflag:
+            print("stopping loop")
+            loop.stop()
+
         await asyncio.sleep(1)
-        await inctime()
+
+timeloop = asyncio.new_event_loop()
+asyncio.set_event_loop(timeloop)
+asyncio.ensure_future(inctime(timeloop))
 
 ###SLASH IS OLD, DONT USE
 @slash.slash(name="ping", guild_ids=guild_ids, description="Ahaa jako zkus to co myslíš že to dělá asi")
@@ -400,7 +428,7 @@ async def playqueuelist(ctx):
     global curmin
     global stopflag
 
-    print("Checking for stopped player")
+    #print("Checking for stopped player")
 
     if len(queuelist) == 0:
         print("queuelist is empty, quitting")
@@ -439,11 +467,11 @@ async def playqueuelist(ctx):
                 del queuelist[0]
                 print(f"prev {prev}")
             curtime = 0
-            curmin = 0
             print("starting timer")
             stopflag = False
             #await inctime() #Maybe try to multithread the inctime? idk anymore shit's hard
-            t = Thread(target=asyncio.run, args=(inctime(),))
+            #t = Thread(target=asyncio.run, args=(inctime(),)) #Old inctime, reaches recursion limit
+            t = Thread(target=timeloop.run_forever)
             t.start()
             print("after inctime")
             #timer.cancel()
