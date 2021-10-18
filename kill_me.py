@@ -117,8 +117,8 @@ curtime = 0
 curmin = 0
 loopone = False
 loopqueueflag = False
-print(callsign)
-print(type(callsign))
+#print(callsign)
+#print(type(callsign))
 #opus.load_opus()
 
 def switch(x):
@@ -160,7 +160,83 @@ FILES = {
 bot = commands.Bot(command_prefix=callsign)
 slash = SlashCommand(bot, sync_commands=True)
 guild_ids = [699726889085960235]
-print(callsign)
+#print(callsign)
+
+bot.remove_command("help")
+
+###HELP COMMANDS###
+@bot.group(invoke_without_command=True)
+async def help(ctx):
+    em = discord.Embed(title="Help", description="Use $help <command> for extended info on a command.", color=0xff0000)
+    em.add_field(name="Playback control", value="np,playlist,remove,queue,seek,fs,loop,play")
+    await ctx.send(embed = em)
+
+@help.command()
+async def np(ctx):
+    em = discord.Embed(title="Now playing", description="Shows info about the currently playing song", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$np`")
+
+    await ctx.send(embed=em)
+
+@help.command()
+async def playlist(ctx):
+    em = discord.Embed(title="Playlist", description="Adds a saved playlist to queue", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$playlist <playlist name>`")
+
+    await ctx.send(embed=em)
+
+@help.command()
+async def remove(ctx):
+    em = discord.Embed(title="Remove", description="Removes song from queue", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$remove <queue number>`")
+
+    await ctx.send(embed=em)
+
+@help.command()
+async def queue(ctx):
+    em = discord.Embed(title="Queue", description="Shows info about all queued songs", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$queue`")
+
+    await ctx.send(embed=em)
+
+@help.command()
+async def seek(ctx):
+    em = discord.Embed(title="Seek", description="Plays song from a certain time", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$seek <seconds>`")
+
+    await ctx.send(embed=em)
+
+@help.command()
+async def fs(ctx):
+    em = discord.Embed(title="Force skip", description="Skips currently playing song", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$fs`")
+
+    await ctx.send(embed=em)
+
+@help.command()
+async def loop(ctx):
+    em = discord.Embed(title="Loop", description="Toggles on loop for current song", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$loop`")
+
+    await ctx.send(embed=em)
+
+@help.command()
+async def play(ctx):
+    em = discord.Embed(title="Play", description="Plays a song", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$play <ULR or search>`")
+
+    await ctx.send(embed=em)
+
+###END HELP COMMANDS###
+
 
 @bot.command()
 async def np(ctx):
@@ -183,7 +259,8 @@ async def np(ctx):
             await ctx.send(f"Not playing anything")
     except Exception as e:
         print(e)
-        await ctx.send(f"Not connected to VC")
+    await ctx.send(f"Not connected to VC")
+
 
 @bot.command()
 async def playlist(ctx, playlist_name):
