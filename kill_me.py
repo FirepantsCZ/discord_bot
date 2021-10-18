@@ -56,13 +56,13 @@ ytdl_format_options = {
 }
 
 ffmpeg_options = {
-    'options': '-vn -ss 0',
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+    'options': '-vn',
+    "before_options": "-ss 0 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
-print(pafy.new("https://www.youtube.com/watch?v=4bvLaYLD1HI", ydl_opts=ytdl_format_options).length) #Pafy test
+assert pafy.new("https://www.youtube.com/watch?v=4bvLaYLD1HI", ydl_opts=ytdl_format_options).length != 0 #Sanity check
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -306,13 +306,25 @@ async def queue(ctx):
         await ctx.send("Queue is empty")
 
 @bot.command()
-async def seek(ctx, pos): #TODO: Fix longer loading for longre skip times(0-10 instant, 60 takes long)
+async def seek(ctx, pos): #TODO: Speedup is almost fixed, maybe possible to get time down even more
     global ffmpeg_options
     global queuelist
     global vc
     global curtime
 
-    ffmpeg_options["options"] = f'-vn -ss {pos}'
+    try:
+        if vc.is_paused():
+            em = discord.Embed(title="Error :octagonal_sign:", description="Cannot seek while player is paused", color=0xff0000)
+            await ctx.send(embed=em)
+            return
+    except:
+        em = discord.Embed(title="Error :octagonal_sign:", description="Not connected to any VC", color=0xff0000)
+        await ctx.send(embed=em)
+        return
+
+    pos = time_to_seconds(pos)
+
+    ffmpeg_options["before_options"] = f"-ss {pos} -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5" #Changed from after options to before options, ffmpeg wiki "seeking"
     queuelist.insert(0, prev)
     try:
         vc.stop()
@@ -324,6 +336,15 @@ async def seek(ctx, pos): #TODO: Fix longer loading for longre skip times(0-10 i
         await playqueuelist(ctx)
     else:
         print("playqueuelist should be looping")
+
+    try:
+        print("cycling playback")
+        vc.pause()
+        await asyncio.sleep(1.5) #Possibly could go lower, needs more experimenting
+        vc.resume()
+    except:
+        print("Couldn't cycle")
+
     curtime = int(pos)
 
 @bot.command()
@@ -353,13 +374,29 @@ async def loopqueue(ctx): #TODO: Add loopqueue function
 
 @bot.command()
 async def pause(ctx):
+    global stopflag
+
     try:
         if vc.is_paused():
+            #print("Threads before:")
+            #for thread in threading.enumerate(): 
+                #print(thread.name)
+            stopflag = False
+            timeloop = asyncio.new_event_loop()
+            asyncio.set_event_loop(timeloop)
+            asyncio.ensure_future(inctime(timeloop))
+            t = Thread(target=timeloop.run_forever)
+            t.start()
+            print("started thread")
+
             vc.resume()
             em = discord.Embed(title="Resumed :arrow_forward:", description=f"[{get_title(prev)}]({prev}) | `{format_time(curtime)} / {format_time(pafy.new(prev).length)}`", color=0xff0000)
             await ctx.send(embed=em)
         else:
             vc.pause()
+
+            stopflag = True
+
             em = discord.Embed(title="Paused :pause_button:", description=f"[{get_title(prev)}]({prev}) | `{format_time(curtime)} / {format_time(pafy.new(prev).length)}`", color=0xff0000)
             await ctx.send(embed=em)
 
@@ -423,6 +460,17 @@ async def play(ctx, *, search):
     await playqueuelist(ctx)
 
 ###UTILITY FUNCTIONS###
+def time_to_seconds(foramtted_time):
+    if foramtted_time.count(":") == 0:
+        return foramtted_time
+    elif foramtted_time.count(":") == 1:
+        return int(datetime.timedelta(minutes=int(pos.split(":")[0]), seconds=int(pos.split(":")[1])).total_seconds())
+    elif foramtted_time.count(":") == 2:
+        return int(datetime.timedelta(hours=int(pos.split(":")[0]), minutes=int(pos.split(":")[1]), seconds=int(pos.split(":")[2])).total_seconds())
+    else:
+        raise ValueError("Invalid time format")
+
+
 
 def get_title(url):
     return yt.get_video_metadata(video_id=url.split("?v=")[1][:11])["video_title"]
@@ -443,17 +491,22 @@ async def inctime(loop):
         #print(f"{t.minute}:{t.second:02d}")
 
         curtime += 1
+        #print(curtime)
 
         #print(f"Stopflag is {stopflag}")
         if stopflag:
             print("stopping loop")
             loop.stop()
+            break
 
         await asyncio.sleep(1)
 
 timeloop = asyncio.new_event_loop()
 asyncio.set_event_loop(timeloop)
 asyncio.ensure_future(inctime(timeloop))
+
+t = Thread(target=timeloop.run_forever)
+t.start()
 
 async def playqueuelist(ctx):
     global vc
@@ -483,31 +536,29 @@ async def playqueuelist(ctx):
         pass
     try:
         if vc.is_paused():
-            await ctx.send("You shouldn't ever see this message")
-            print("WTF did you do")
+            print("Player is paused, returning")
             return
         elif vc.is_playing():
             #print("Already playing, added to queuelist and waiting")
             pass
         else:
             print("Nothing playing, going to next song...")
-            stopflag = True
-            await asyncio.sleep(1) #Set to 2 to be safe, 1 seems to work
+            #await asyncio.sleep(1) #Set to 2 to be safe, 1 seems to work, IF IT DOESN'T WORK, TURN BACK ON
             pt = Thread(target=vc.play, args=(player,)) #Try starting player on different thread?
             pt.start()
+            ffmpeg_options["before_options"] = f"-ss 0 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5" #Set start position to 0
             #vc.play(player) #TODO: FIX STUTTERING AND SKIPPING ISSUE (holy shit maybe threading actually works)
             if not loopone and not loopqueueflag:
                 prev = queuelist[0]
                 del queuelist[0]
-                print(f"prev {prev}")
             curtime = 0
-            print("starting timer")
-            stopflag = False
+            print("restarting timer")
             #await inctime() #Maybe try to multithread the inctime? idk anymore shit's hard
             #t = Thread(target=asyncio.run, args=(inctime(),)) #Old inctime, reaches recursion limit
-            t = Thread(target=timeloop.run_forever)
-            t.start()
-            print("after inctime")
+
+            #t = Thread(target=timeloop.run_forever) #these 2 lines work
+            #t.start()
+            
             #timer.cancel()
 
     except Exception as e:
@@ -552,7 +603,7 @@ async def _play(ctx, playopt: str, vc=vc):
 
 @bot.event
 async def on_ready():
-    print('We have logged in as {0.user}'.format(bot))
+    print(f'We have logged in as {bot.user}')
     #await client.get_channel(tchan).send(":white_check_mark: **Bot started**")
 
 """ @bot.event
