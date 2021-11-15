@@ -209,7 +209,7 @@ async def loop(ctx):
 async def play(ctx):
     em = discord.Embed(title="Play", description="Plays a song", color=0xff0000)
 
-    em.add_field(name="**Syntax**", value="`$play <ULR or search>`")
+    em.add_field(name="**Syntax**", value="`$play <URL or search>`")
 
     await ctx.send(embed=em)
 
