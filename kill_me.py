@@ -221,6 +221,7 @@ async def pause(ctx):
 
     await ctx.send(embed=em)
 
+#sračka
 ###BOT COMMANDS###
 
 @bot.command()
