@@ -401,14 +401,22 @@ async def lyrics(ctx, song="", artist=""):
         await ctx.send(embed=em)
 
 @bot.command()
-async def image(ctx, query):
+async def image(ctx, query, limit=1):
     _search_params["q"] = query
-    gis.search(search_params=_search_params)
+    _search_params["num"] = int(limit)
+    try:
+        gis.search(search_params=_search_params)
+    except Exception as e:
+        print(e)
 
-    em = discord.Embed(title=f"Found image for `{query}`", description="", color=0xff0000)
-    em.set_image(url=gis.results()[0].url)
-    await ctx.send(embed=em)
+    for image in gis.results():
+        em = discord.Embed(title=f"Image for `{query}`\n`{gis.results().index(image) + 1}` of `{len(gis.results())}`", description="", color=0xff0000)
+        em.set_image(url=image.url)
+        await ctx.send(embed=em)
 
+    
+    #gis._number_of_images = None #Uncomment if "num" doesnt reset between searches
+    #gis._search_result = []
 
 @bot.command()
 async def remove(ctx, queue_index):
