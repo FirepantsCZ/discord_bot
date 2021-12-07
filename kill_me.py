@@ -70,7 +70,7 @@ ytdl_format_options = {
     'restrictfilenames': True,
     'noplaylist': True,
     'nocheckcertificate': True,
-    'ignoreerrors': False,
+    'ignoreerrors': True,
     'logtostderr': False,
     'quiet': True,
     'no_warnings': False,
@@ -283,7 +283,7 @@ async def playlist(ctx, action, playlist_name=""): #TODO: Add listing every play
 
     if (action == "play" or action == "Play") and playlist_name != "":
         #Add playlist to queue
-        flg = False
+        failed = 0
         for i in playlists:
             if playlist_name == i.get("name"):
                 print(f"got {playlist_name}")
@@ -291,15 +291,16 @@ async def playlist(ctx, action, playlist_name=""): #TODO: Add listing every play
                     if j != "name":
                         print(i.get(j))
                         queuelist.append(i.get(j))
-                em = discord.Embed(title="Playing :musical_note:", description=f"Adding playlist `{playlist_name}` to queue", color=0xff0000)
+                em = discord.Embed(title="Playing :musical_note:", description=f"Added playlist `{playlist_name}` to queue", color=0xff0000)
                 await ctx.send(embed=em)
                 await playqueuelist(ctx) #TODO: FIX: WHEN SEEKING A SONG WITH SONGS IN QUEUE AFTER IT, IT GETS SKIPPED SOMETIMES
+                break
             else:
-                flg = True
-        if flg:
+                failed += 1
+        if failed >= len(playlists):
             em = discord.Embed(title="Error :octagonal_sign:", description=f"Playlist `{playlist_name}` not found", color=0xff0000)
             await ctx.send(embed=em)
-            flg = False
+            #failed = 0
     elif (action == "remove" or action == "Remove") and playlist_name != "":
         #Remove named playlist
         flg = False
@@ -700,7 +701,9 @@ async def playqueuelist(ctx):
             print("Nothing playing, going to next song...")
             await asyncio.sleep(0.5) #Set to 2 to be safe, 1 seems to work, IF IT DOESN'T WORK, TURN BACK ON
             pt = Thread(target=vc.play, args=(player,)) #Try starting player on different thread?
-            pt.start()
+
+            pt.start() #TODO: Fix sometimes player doesn't start because of http 403 right at the beginning of playback
+
             ffmpeg_options["before_options"] = f"-ss 0 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5" #Set start position to 0
             #vc.play(player) #TODO: FIX STUTTERING AND SKIPPING ISSUE (holy shit maybe threading actually works)
             if not loopone and not loopqueueflag:
