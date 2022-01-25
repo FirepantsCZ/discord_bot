@@ -5,10 +5,10 @@ import json
 import threading
 import atexit
 import sched
-import googletrans
+#import googletrans
 import datetime
 from google_images_search import GoogleImagesSearch
-from googletrans import Translator
+#from googletrans import Translator
 import pprint
 from threading import Timer, Thread
 import youtube_dl
@@ -16,6 +16,7 @@ import youtube_dl
 from youtubesearchpython import *
 import os
 import asyncio
+import duolingo
 from lyricsgenius import Genius
 from discord_slash import SlashCommand
 from discord_slash.utils.manage_commands import create_option
@@ -29,7 +30,6 @@ import pafy #TODO: MAYBE TRY USING LESS THAN 30 YT APIs? Try to maybe change all
 #
 ###########
 
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 print(f"Bot token: {BOT_TOKEN}")
 YT_API_KEY = os.getenv("YT_API_KEY")
@@ -38,6 +38,10 @@ GENIUS_API_KEY = os.getenv("GENIUS_API_KEY")
 print(f"Genius API key: {GENIUS_API_KEY}")
 GOOGLE_IMAGESEARCH_CX = os.getenv("GOOGLE_IMAGESEARCH_CX")
 print(f"Google image search cx: {GOOGLE_IMAGESEARCH_CX}")
+DUO_NAME = os.getenv("DUO_NAME")
+print(f"Duolingo name: {DUO_NAME}")
+DUO_PASS = os.getenv("DUO_PASS")
+print(f"Duolingo pass: {DUO_PASS}")
 
 
 #easy_wrapper = YoutubeEasyWrapper()
@@ -47,6 +51,7 @@ yt = YouTubeDataAPI(YT_API_KEY)
 pafy.set_api_key(YT_API_KEY)
 genius = Genius(GENIUS_API_KEY)
 gis = GoogleImagesSearch(YT_API_KEY, GOOGLE_IMAGESEARCH_CX)
+lingo = duolingo.Duolingo(DUO_NAME, DUO_PASS)
 
 s = sched.scheduler(time.time, asyncio.sleep)
 
@@ -90,6 +95,7 @@ assert pafy.new("https://www.youtube.com/watch?v=4bvLaYLD1HI", ydl_opts=ytdl_for
 #print(genius.search_song("I wanna be your slave", "Maneskin").lyrics)
 #gis.search(search_params=_search_params)
 #print(gis.results()[0].url)
+#print(pafy.get_playlist2(r"https://www.youtube.com/playlist?list=PL0E199CDDE92F83DE"))
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -251,6 +257,14 @@ async def pause(ctx):
 
     await ctx.send(embed=em)
 
+@help.command()
+async def image(ctx):
+    em = discord.Embed(title="Image", description="Searches for images on Google", color=0xff0000)
+
+    em.add_field(name="**Syntax**", value="`$image <query> [limit]`")
+
+    await ctx.send(embed=em)
+
 ###BOT COMMANDS###
 
 @bot.command()
@@ -404,7 +418,13 @@ async def lyrics(ctx, song="", artist=""):
 @bot.command()
 async def image(ctx, query, limit=1):
     _search_params["q"] = query
-    _search_params["num"] = int(limit)
+    try:
+        limit = int(limit)
+        _search_params["num"] = limit
+    except:
+        em = discord.Embed(title=f"Error :octagonal_sign:", description="`limit` isn't a number, see `$help image`", color=0xff0000)
+        await ctx.send(embed=em)
+        return
     try:
         gis.search(search_params=_search_params)
     except Exception as e:
@@ -428,6 +448,10 @@ async def remove(ctx, queue_index):
         del queuelist[int(queue_index)-1]
     else:
         await ctx.send("Invalid queue position!")
+
+@bot.command()
+async def duolingo(ctx):
+    await ctx.send(f"```{lingo.get_language_progress('it')}```")
 
 @bot.command()
 async def queue(ctx):
@@ -567,19 +591,28 @@ async def play(ctx, *, search):
         await ctx.send(f"Loading...```{search}```")
         #easy_wrapper.get_metadata(video_id)
         #metadata = easy_wrapper.get_metadata(video_id=search.split("?v=")[1][:11]) # this is also good
-        metadata = yt.get_video_metadata(video_id=search.split("?v=")[1][:11])
+        if "playlist" in search:
+            vidlist = [f"https://www.youtube.com/watch?v={i.videoid}" for i in pafy.get_playlist2(vidlink)]
+            for j in vidlist:
+                print(j)
+                queuelist.append(j)
+            metadata = pafy.new(vidlist[0].split("?v=")[1][:11])
+        else:
+            metadata = pafy.new(vidlink.split("?v=")[1][:11])
+            queuelist.append(vidlink)
     else:
         await ctx.send(f"Loading...```{search}```")
         vidlink = VideosSearch(search, limit=3).result().get("result")[0].get("link")
         #print(vidlink.split("?v=")[1][:11])
         #metadata = easy_wrapper.get_metadata(video_id=vidlink.split("?v=")[1][:11]) #this is the good one
         #metadata = easy_wrapper.get_metadata(video_id="T12ygsp9Mvg")
-        metadata = yt.get_video_metadata(video_id=vidlink.split("?v=")[1][:11])
+        metadata = pafy.new(vidlink.split("?v=")[1][:11])
         #print(metadata)
+        queuelist.append(vidlink)
     
     #title = "faking ok nebij me este to nefunguje nejlip jo ok"
-    title = metadata["video_title"]
-    thumb = metadata["video_thumbnail"]
+    title = metadata.title
+    thumb = metadata.thumb
     #print(metadata)
  
     """ msg = await ctx.history(limit=1).flatten()
@@ -595,7 +628,6 @@ async def play(ctx, *, search):
         print("can't edit message")
         await ctx.send(f"Added to queue ```{title}```") """
         
-    queuelist.append(vidlink)
     #embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**{title}**]({vidlink})", color=0xff0000)
     #embed=discord.Embed(title="**Now playing** :musical_note:", description=f"[**Title**]({vidlink})", color=0xff0000)
     print(thumb)
