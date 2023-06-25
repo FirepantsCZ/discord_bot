@@ -1,0 +1,4 @@
+nextcord>=2.5.0
+python-dotenv>=1.0.0
+yt_dlp>=2023.6.22
+nextcord-ext-menus>=1.5.6
