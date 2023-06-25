@@ -39,10 +39,20 @@ class Player(commands.Cog):
 
         # TODO investigate speedup/stuttering issue
         ffmpeg_options = {
-            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            "options": f"-ss {time} -vn -bufsize 1k"  # bufsize may not do anything here, but it shouldn't hurt
+            "options": f"-vn -bufsize 1k"  # bufsize may not do anything here, but it shouldn't hurt
         }
-        opus_source = FFmpegOpusAudio(self.control_menu.video_url, **ffmpeg_options)
+
+        if os.path.exists("ydl_out/out"):
+            print("playing from file")
+
+            ffmpeg_options["before_options"] = f"-ss {time}"
+            opus_source = FFmpegOpusAudio("ydl_out/out", **ffmpeg_options)
+        else:
+            print("playing from normal url source")
+
+            ffmpeg_options["before_options"] = f"-ss {time} -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+            opus_source = FFmpegOpusAudio(self.control_menu.video_url, **ffmpeg_options)
+
         voice_client.play(opus_source, after=self.control_menu.handle_after)
 
     @nextcord.slash_command(description="Play something from YouTube", guild_ids=DEFAULT_GUILD_IDS)

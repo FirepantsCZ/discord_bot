@@ -53,7 +53,7 @@ class VideoSelectMenu(menus.ButtonMenu):
 
         self.stop()
 
-    @nextcord.ui.button(label="Add to queue")
+    @nextcord.ui.button(label="Add to queue", emoji="🔗")
     async def on_preview_toggle(self, button, interaction):
         await interaction.response.edit_message(view=self)
 
@@ -74,15 +74,14 @@ class ControlMenu(menus.ButtonMenu):
         # print(f"playing {self.video['webpage_url']}")
         # await interaction.send("Loading video...")
 
-        ydl_options = {"outtmpl": "./ydl_out/out", "overwrites": True, "format": "ba", "nopart": True}
+        ydl_options = {"outtmpl": "./ydl_out/out", "overwrites": True, "format": "ba"}
 
-        # with YoutubeDL(ydl_options) as ydl:
-        # download_thread = threading.Thread(target=ydl.download, args=(self.video["webpage_url"],))
-        # download_thread.start()"""
+        with YoutubeDL(ydl_options) as ydl:
+            download_thread = threading.Thread(target=ydl.download, args=(self.video["webpage_url"],))
+            download_thread.start()
 
-        """await asyncio.sleep(3)  # delay to let file start downloading
-        while not os.path.exists("ydl_out/out"):
-            await asyncio.sleep(1)"""
+        if os.path.exists("ydl_out/out"):
+            os.remove("ydl_out/out")
 
         ffmpeg_options = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
