@@ -2,7 +2,7 @@ import datetime
 import os.path
 
 import nextcord
-from nextcord import Embed, Colour, FFmpegOpusAudio, ClientException, VoiceClient, Message, Interaction
+from nextcord import Embed, Colour, FFmpegOpusAudio, ClientException, VoiceClient, Message, Interaction, VoiceChannel
 from nextcord.ui.button import Button, ButtonStyle
 from nextcord.ext import menus
 
@@ -22,9 +22,11 @@ class VideoSelectMenu(menus.ButtonMenu):
 
         self.video = video
         self.start_time = None
-        self.voice_client: VoiceClient | None = None
+        # self.voice_client: VoiceClient | None = None
+        self.selected = False
         self.seeking = False
         self.video_url: str = ""
+        self.voice_channel: VoiceChannel | None = None
 
         super().__init__(disable_buttons_after=True, delete_message_after=True)
         self.add_item(Button(label="Open", url=self.video["webpage_url"]))
@@ -46,28 +48,45 @@ class VideoSelectMenu(menus.ButtonMenu):
 
     @nextcord.ui.button(label="Play", style=ButtonStyle.primary, emoji="🎵")
     async def on_play(self, button, interaction: Interaction):
-        # print(f"playing {self.video['webpage_url']}")
+        self.selected = True
         await interaction.response.defer()
-        # await interaction.send("Loading video...")
 
-        if not interaction.user.voice:
-            await self.interaction.followup.send("Not in any voice channel", ephemeral=True)
-            self.stop()
-            return
+        self.stop()
+
+    @nextcord.ui.button(label="Add to queue")
+    async def on_preview_toggle(self, button, interaction):
+        await interaction.response.edit_message(view=self)
+
+    async def finalize(self, timed_out: bool):
+        print("finalizing menu")
+        # await self.interaction.delete_original_message()
+        print(f"menu {self} finalized successfully")
+
+
+class ControlMenu(menus.ButtonMenu):
+    def __init__(self, video: dict, voice_client: VoiceClient):
+
+        self.voice_client: VoiceClient = voice_client
+        self.video: dict = video
+        self.seeking: bool = False
+        self.elapsed: datetime.timedelta | None = None
+
+        # print(f"playing {self.video['webpage_url']}")
+        # await interaction.send("Loading video...")
 
         ydl_options = {"outtmpl": "./ydl_out/out", "overwrites": True, "format": "ba", "nopart": True}
 
-        """with YoutubeDL(ydl_options) as ydl:
-            download_thread = threading.Thread(target=ydl.download, args=(self.video["webpage_url"],))
-            download_thread.start()"""
+        # with YoutubeDL(ydl_options) as ydl:
+        # download_thread = threading.Thread(target=ydl.download, args=(self.video["webpage_url"],))
+        # download_thread.start()"""
 
-        await asyncio.sleep(3)  # delay to let file start downloading
+        """await asyncio.sleep(3)  # delay to let file start downloading
         while not os.path.exists("ydl_out/out"):
-            await asyncio.sleep(1)
+            await asyncio.sleep(1)"""
 
         ffmpeg_options = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            "options": "-vn -bufsize 6000k"  # idk if bufsize does anything here but i guess it doesn't hurt
+            "options": "-vn -bufsize 1k"
         }
         best_quality = -1
         for i in self.video["formats"]:
@@ -80,48 +99,8 @@ class VideoSelectMenu(menus.ButtonMenu):
         print(f"url: {self.video_url}")
         opus_source = FFmpegOpusAudio(self.video_url, **ffmpeg_options)
 
-        voice_channel = interaction.user.voice.channel
-        voice_client = await voice_channel.connect()
-
-        self.voice_client = voice_client
-
-        voice_client.play(opus_source, after=self.handle_after)
-        self.start_time = datetime.now()
-        self.stop()
-
-    async def handle_after(self, error):
-        print(f"id: {self.id}")
-        print(f"seeking status: {self.seeking}")
-        if self.seeking:
-            print("seeking, don't disconnect, resetting seeking")
-            self.seeking = False
-        else:
-            await self.voice_client.disconnect()
-
-    async def finalize(self, timed_out: bool):
-        print("finalizing menu")
-        await self.interaction.delete_original_message()
-        print(f"menu {self} finalized successfully")
-
-    @nextcord.ui.button(label="Show preview")
-    async def on_preview_toggle(self, button, interaction):
-        if self.preview_shown:
-            button.label = "Show preview"
-            self.preview_shown = False
-        else:
-            button.label = "Hide preview"
-            self.preview_shown = True
-
-        await interaction.response.edit_message(view=self)
-
-
-class ControlMenu(menus.ButtonMenu):
-    def __init__(self, voice_client: VoiceClient, video: dict, start_time: datetime):
-
-        self.voice_client = voice_client
-        self.video = video
-        self.start_time = start_time
-        self.elapsed = datetime.now() - start_time
+        self.voice_client.play(opus_source, after=self.handle_after)
+        self.start_time: datetime.datetime = datetime.now()
 
         super().__init__(disable_buttons_after=True, delete_message_after=True, timeout=None)
 
@@ -141,6 +120,13 @@ class ControlMenu(menus.ButtonMenu):
 
             await asyncio.sleep(0.5)
         self.stop()
+
+    async def handle_after(self, error):
+        if self.seeking:
+            print("seeking, don't disconnect, resetting seeking")
+            self.seeking = False
+        else:
+            await self.voice_client.disconnect()
 
     async def send_initial_message(self, ctx, channel):
         message = await self.interaction.channel.send(content="Now playing 🎵", embed=Embed(
