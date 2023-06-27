@@ -1,15 +1,23 @@
-import asyncio
-import os
-
+# NEXTCORD MODULES
 import nextcord
-from nextcord import VoiceClient, Interaction, SlashOption, FFmpegOpusAudio, Message
+from nextcord import VoiceClient, Interaction, SlashOption, FFmpegOpusAudio, Message, Embed, Colour
 from nextcord.ext import commands
 from nextcord.ext.commands.bot import Bot
-from yt_dlp import YoutubeDL
 
+# BOT COMPONENTS
 from bot_menus import ControlMenu, VideoSelectMenu
+from bot_base import DEFAULT_GUILD_IDS, GENIUS_API_KEY
 
-from bot_base import DEFAULT_GUILD_IDS
+# MEDIA APIs
+from yt_dlp import YoutubeDL
+from lyricsgenius import Genius, song
+
+# OTHER MODULES
+import asyncio
+import os
+from datetime import datetime, date, time
+from pprint import pprint
+from shazamio import Shazam
 
 
 class Player(commands.Cog):
@@ -17,21 +25,99 @@ class Player(commands.Cog):
         self.bot = bot_client
         self.control_menu: ControlMenu | None = None
 
+    @nextcord.slash_command(description="Find lyrics to playing song", guild_ids=DEFAULT_GUILD_IDS)
+    async def lyrics(self, interaction: Interaction): # add deep search option?
+        # TODO make function from this, mby decorator
+        if not interaction.user.voice:
+            await interaction.send("❌Not in voice channel", ephemeral=True)
+            return
+
+        voice_clients = [voice_client for voice_client in self.bot.voice_clients if voice_client.channel == interaction.user.voice.channel]
+        voice_client = voice_clients[0] if len(voice_clients) == 1 else None
+
+        if not voice_client:
+            await interaction.send("❌Not playing anything in current VC", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        #genius = Genius(GENIUS_API_KEY)
+
+        shazam = Shazam()
+
+        lyrics = ""
+        result = await shazam.recognize_song("ydl_out/out")
+        if len(result["matches"]):
+            for section in result["track"]["sections"]:
+                if section["type"] == "LYRICS":
+                    lyrics = "\n".join(section["text"])
+                    #pprint(section["text"])
+            title = result["track"]["title"]
+            artist = result["track"]["subtitle"]
+
+        else:
+            await interaction.send("❌Lyrics not found.", ephemeral=True)
+            return
+
+        # embed description limit is 4096 chars
+        lyrics_list = [lyrics[i:i + 4096] for i in range(0, len(lyrics), 4096)]
+
+        for page, lyrics in enumerate(lyrics_list, 1):
+            # could make embed color from album cover color
+            await interaction.send(embed=Embed(
+                colour=Colour.red(),
+                title=title,
+                description=lyrics)
+                .set_author(name=artist)
+                .set_footer(text=f"lyrics page {page}/{len(lyrics_list)}")
+            )
+
+        """if result:
+            # embed description limit is 4096 chars
+            lyrics_list = [result.lyrics[i:i + 4096] for i in range(0, len(result.lyrics), 4096)]
+
+            for page, lyrics in enumerate(lyrics_list, 1):
+                # could make embed color from album cover color
+                await interaction.send(embed=Embed(
+                    colour=Colour.red(),
+                    title=result.title,
+                    description=lyrics)
+                    .set_author(name=result.artist)
+                    .set_footer(text=f"lyrics page {page}/{len(lyrics_list)}")
+                )
+        else:
+            await interaction.send("❌Lyrics not found.", ephemeral=True)"""
+
     @nextcord.slash_command(description="Seek to a specific time in the playing video", guild_ids=DEFAULT_GUILD_IDS)
-    async def seek(self, interaction: Interaction, time: str = SlashOption(
+    async def seek(self, interaction: Interaction, target_time: str = SlashOption(
         name="time",
         description="Time to seek to [hh:mm:ss]"
     )):
-        voice_client: VoiceClient | None = self.bot.voice_clients[0] if len(self.bot.voice_clients) else None
-
-        if not voice_client:
-            await interaction.send("Not playing anything!", ephemeral=True)
+        if not interaction.user.voice:
+            await interaction.send("❌Not in voice channel", ephemeral=True)
             return
 
-        await interaction.send(f"seeking to `{time}`", ephemeral=True)
+        voice_clients = [voice_client for voice_client in self.bot.voice_clients if voice_client.channel == interaction.user.voice.channel]
+        voice_client = voice_clients[0]  if len(voice_clients) == 1 else None
 
-        # TODO maybe convert/check user input time
+        if not voice_client:
+            await interaction.send("❌Not playing anything in current VC", ephemeral=True)
+            return
 
+        # try all possible user input combinations
+        time_format: str = "%H:%M:%S"
+        converted_time = None
+        for _ in range(3):
+            try:
+                converted_time = datetime.strptime(target_time, time_format).time()
+            except ValueError:
+                time_format = time_format[3:]
+        if not converted_time:
+            await interaction.send("❌Wrong time format", ephemeral=True)
+            return
+
+        converted_time = datetime.combine(date.min, converted_time) - datetime.min
+
+        await interaction.send(f"✅Seeking to `{str(converted_time)}`")
         # tell video select menu we are seeking
         # stop player and restart it at desired position
         self.control_menu.seeking = True
@@ -45,15 +131,16 @@ class Player(commands.Cog):
         if os.path.exists("ydl_out/out"):
             print("playing from file")
 
-            ffmpeg_options["before_options"] = f"-ss {time}"
+            ffmpeg_options["before_options"] = f"-ss {target_time}"
             opus_source = FFmpegOpusAudio("ydl_out/out", **ffmpeg_options)
         else:
             print("playing from normal url source")
 
-            ffmpeg_options["before_options"] = f"-ss {time} -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+            ffmpeg_options["before_options"] = f"-ss {target_time} -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
             opus_source = FFmpegOpusAudio(self.control_menu.video_url, **ffmpeg_options)
 
         voice_client.play(opus_source, after=self.control_menu.handle_after)
+        self.control_menu.start_time = -converted_time + datetime.now()
 
     @nextcord.slash_command(description="Play something from YouTube", guild_ids=DEFAULT_GUILD_IDS)
     async def play(self, interaction: Interaction, query: str = SlashOption(

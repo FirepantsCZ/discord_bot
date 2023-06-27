@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 # env vars
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+GENIUS_API_KEY = os.getenv("GENIUS_API_KEY")
 
 # other consts
 DEFAULT_EXTENSIONS: list[str] = ["player", "utils"]
@@ -17,6 +18,7 @@ ADMIN_USER_IDS: list[int] = [509737193749741588]
 
 bot = commands.Bot(default_guild_ids=DEFAULT_GUILD_IDS)
 
+# TODO AUTO EXTENSION RELOADER
 
 # sync commands, maybe not needed but doesn't hurt
 @bot.event
