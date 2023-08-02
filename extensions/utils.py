@@ -12,6 +12,16 @@ class Utils(Cog):
     def __init__(self, bot_client: Bot):
         self.bot = bot_client
 
+    @slash_command(description="Send message to current channel")
+    async def send_message(self, interaction: Interaction, message: str = SlashOption(
+        name="message",
+        description="Message to send",
+        required=True
+    )):
+        # add channel selection from guild
+        await interaction.send("Sending message...", ephemeral=True)
+        await interaction.channel.send(message)
+
     @slash_command(description="Reload extension")
     async def reload_extension(self, interaction: Interaction, extension_name: str = SlashOption(
         name="extension",

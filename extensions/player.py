@@ -71,7 +71,7 @@ class Player(commands.Cog):
                 .set_footer(text=f"lyrics page {page}/{len(lyrics_list)}")
             )
 
-        """if result:
+        """ if result:
             # embed description limit is 4096 chars
             lyrics_list = [result.lyrics[i:i + 4096] for i in range(0, len(result.lyrics), 4096)]
 
@@ -97,7 +97,7 @@ class Player(commands.Cog):
             return
 
         voice_clients = [voice_client for voice_client in self.bot.voice_clients if voice_client.channel == interaction.user.voice.channel]
-        voice_client = voice_clients[0]  if len(voice_clients) == 1 else None
+        voice_client = voice_clients[0] if len(voice_clients) == 1 else None
 
         if not voice_client:
             await interaction.send("❌Not playing anything in current VC", ephemeral=True)
@@ -142,6 +142,8 @@ class Player(commands.Cog):
         voice_client.play(opus_source, after=self.control_menu.handle_after)
         self.control_menu.start_time = -converted_time + datetime.now()
 
+    # TODO add queue implementation
+    # TODO add playlist support
     @nextcord.slash_command(description="Play something from YouTube", guild_ids=DEFAULT_GUILD_IDS)
     async def play(self, interaction: Interaction, query: str = SlashOption(
         name="query",
