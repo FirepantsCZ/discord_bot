@@ -19,8 +19,13 @@ from yt_dlp import YoutubeDL
 # TODO: possibly add pages to searches?
 
 
+class CancelButton(Button):
+    async def callback(self, interaction):
+        self.view.cancelled = True
+        self.view.stop()
+
 class VideoSelectMenu(menus.ButtonMenu):
-    def __init__(self, video: dict):
+    def __init__(self, video: dict, last):
         self.preview_shown = False
 
         self.video = video
@@ -28,9 +33,12 @@ class VideoSelectMenu(menus.ButtonMenu):
         self.selected = False
         self.video_url: str = ""
         self.voice_channel: VoiceChannel | None = None
+        self.cancelled = False
 
         super().__init__(disable_buttons_after=True, delete_message_after=True)
         self.add_item(Button(label="Open", url=self.video["webpage_url"]))
+        if last:
+            self.add_item(CancelButton(label="Cancel search", emoji="✖️", style=ButtonStyle.red))
 
     async def send_initial_message(self, ctx, channel):
         # could use interaction.followup.send() to show as responding to command

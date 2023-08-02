@@ -24,6 +24,7 @@ class Player(commands.Cog):
     def __init__(self, bot_client: Bot):
         self.bot = bot_client
         self.control_menu: ControlMenu | None = None
+        self.search_limit: int = 3
 
     @nextcord.slash_command(description="Find lyrics to playing song", guild_ids=DEFAULT_GUILD_IDS)
     async def lyrics(self, interaction: Interaction): # add deep search option?
@@ -156,17 +157,29 @@ class Player(commands.Cog):
             remove_message = await run_once(interaction.delete_original_message)
 
             video_menus = []
-            for video in search_youtube(query, 3):
+            for index, video in enumerate(search_youtube(query, self.search_limit), start=1):
+                last = index == self.search_limit
                 video_info = get_video_info(video["url"])
-                menu = VideoSelectMenu(video_info)
+                menu = VideoSelectMenu(video_info, last=last)
                 video_menus.append(menu)
+
                 await menu.start(interaction=interaction)
                 await remove_message()
+
+
 
             # could probably be done better without delay, maybe some event listener??
             # TODO redo without delays
             while not any([menu.is_finished() for menu in video_menus]):
                 await asyncio.sleep(1)
+
+            print(f"menus cancelled: {[menu.cancelled for menu in video_menus]}")
+
+            # Check if search was cancelled, stop player
+            if any([menu.cancelled for menu in video_menus]):
+                for menu in video_menus:
+                    menu.stop()
+                return
 
             # await interaction.delete_original_message()
 
