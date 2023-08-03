@@ -47,6 +47,7 @@ class VideoSelectMenu(menus.ButtonMenu):
                 colour=Colour.red(),
                 title=self.video["title"],
                 url=self.video["webpage_url"],
+                # this description is not needed since it is added the first update loop
                 #description=time(second=duration.get("seconds"), minute=duration.get("minutes") or 0, hour=duration.get("hours") or 0).strftime("%H:%M:%S")
                 description=str(timedelta(seconds=int(self.video["duration"])))
             )
@@ -62,10 +63,6 @@ class VideoSelectMenu(menus.ButtonMenu):
 
         self.stop()
 
-    @nextcord.ui.button(label="Add to queue", emoji="🔗")
-    async def on_preview_toggle(self, button, interaction):
-        await interaction.response.edit_message(view=self)
-
     async def finalize(self, timed_out: bool):
         print("finalizing menu")
         # await self.interaction.delete_original_message()
@@ -74,7 +71,6 @@ class VideoSelectMenu(menus.ButtonMenu):
 
 class ControlMenu(menus.ButtonMenu):
     def __init__(self, video: dict, voice_client: VoiceClient):
-
         self.voice_client: VoiceClient = voice_client
         self.video: dict = video
         self.seeking: bool = False
@@ -147,6 +143,7 @@ class ControlMenu(menus.ButtonMenu):
                 # UPDATE NOPART
                 downloaded_size = os.path.getsize('ydl_out/out.part') if os.path.exists(
                     'ydl_out/out.part') else os.path.getsize('ydl_out/out')
+                # TODO add time equivalent to buffer
                 buffer_field = {
                     "name": "Buffer:",
                     "value": f"{downloaded_size}/{self.playlist.totals.size} ({round(downloaded_size / (self.playlist.totals.size / 100), 2)}%)",

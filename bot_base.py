@@ -19,7 +19,8 @@ ADMIN_USER_IDS: list[int] = [509737193749741588]
 
 bot = commands.Bot(default_guild_ids=DEFAULT_GUILD_IDS)
 
-# TODO AUTO EXTENSION RELOADER
+# TODO FIX AUTO EXTENSION RELOADER
+# TODO add proper cleanup after bot finish (remove hanging messages etc.)
 
 # sync commands, maybe not needed but doesn't hurt
 @bot.event

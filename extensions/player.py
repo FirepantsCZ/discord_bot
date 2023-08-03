@@ -10,7 +10,7 @@ from bot_base import DEFAULT_GUILD_IDS, GENIUS_API_KEY
 
 # MEDIA APIs
 from yt_dlp import YoutubeDL
-from lyricsgenius import Genius, song
+# from lyricsgenius import Genius, song
 
 # OTHER MODULES
 import asyncio
@@ -25,6 +25,8 @@ class Player(commands.Cog):
         self.bot = bot_client
         self.control_menu: ControlMenu | None = None
         self.search_limit: int = 3
+        self.play_queue: list[dict] = []
+        self.voice_client: VoiceClient | None = None
 
     @nextcord.slash_command(description="Find lyrics to playing song", guild_ids=DEFAULT_GUILD_IDS)
     async def lyrics(self, interaction: Interaction): # add deep search option?
@@ -41,7 +43,7 @@ class Player(commands.Cog):
             return
 
         await interaction.response.defer()
-        #genius = Genius(GENIUS_API_KEY)
+        # genius = Genius(GENIUS_API_KEY)
 
         shazam = Shazam()
 
@@ -166,14 +168,10 @@ class Player(commands.Cog):
                 await menu.start(interaction=interaction)
                 await remove_message()
 
-
-
             # could probably be done better without delay, maybe some event listener??
             # TODO redo without delays
             while not any([menu.is_finished() for menu in video_menus]):
                 await asyncio.sleep(1)
-
-            print(f"menus cancelled: {[menu.cancelled for menu in video_menus]}")
 
             # Check if search was cancelled, stop player
             if any([menu.cancelled for menu in video_menus]):
@@ -199,17 +197,32 @@ class Player(commands.Cog):
             return
 
         # at this point a video is picked
-
         voice_channel = interaction.user.voice.channel
-        voice_client = await voice_channel.connect()
+        if not self.voice_client:
+            self.voice_client = await voice_channel.connect()
+
+        self.play_queue.append(video)
 
         # now all menus are finalized and deleted
         # make player controls
-        self.control_menu = ControlMenu(video, voice_client)
 
-        # bot.add_view(control_menu)
-        await self.control_menu.start(interaction=interaction)
-        print(f"persistence: {self.control_menu.is_persistent()}")
+        await self._handle_queue_loop(interaction)
+
+        # print(f"persistence: {self.control_menu.is_persistent()}")
+
+    async def _handle_queue_loop(self, interaction):
+        while len(self.play_queue):
+            if self.control_menu:
+                while not self.control_menu.is_finished():
+                    await asyncio.sleep(1)
+
+            if len(self.play_queue):
+                if not self.voice_client.is_connected():
+                    self.voice_client = await interaction.user.voice.channel.connect()
+
+                self.control_menu = ControlMenu(self.play_queue.pop(0), self.voice_client)
+                await self.control_menu.start(interaction=interaction)
+
 
     @nextcord.message_command(name="Play on YouTube")
     async def play_from_message(self, interaction: Interaction, message: Message):
